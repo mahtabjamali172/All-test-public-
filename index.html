@@ -2910,12 +2910,17 @@
                     // the transaction ultimately aborts due to another client already processing the bet.
                     // Returning 'undefined' explicitly aborts; 'committed' is true only when we
                     // actually wrote processed=true first.
-                    const { committed } = await betRef.transaction(current => {
-                        if(!current || current.processed) return undefined;
+                    const { committed, snapshot } = await betRef.transaction(current => {
+                        if(current === null || current === undefined) {
+                            return { ...bet, processed: true };
+                        }
+                        if(current.processed) return undefined;
                         current.processed = true;
                         return current;
                     });
                     if(!committed) continue;
+                    const finalBet = snapshot.val();
+                    if(!finalBet || finalBet.processed !== true) continue;
 
                     const selection = (bet.selection || '').toString().toLowerCase();
                     if(bet.betType === 'color') {
@@ -2985,8 +2990,11 @@
                 // This prevents double-processing when processMissedBets() runs
                 // concurrently with processBetsSafely() for the same bet.
                 const betClaimRef = db.ref('bets/' + bet.period + '/' + betId);
-                const { committed } = await betClaimRef.transaction(current => {
-                    if(!current || current.processed) return undefined;
+                const { committed, snapshot } = await betClaimRef.transaction(current => {
+                    if(current === null || current === undefined) {
+                        return { ...bet, processed: true };
+                    }
+                    if(current.processed) return undefined;
                     current.processed = true;
                     return current;
                 });
@@ -2994,6 +3002,8 @@
                     console.log('[processSingleBet] Bet ' + betId + ' already processed, skipping');
                     return;
                 }
+                const finalBet = snapshot.val();
+                if(!finalBet || finalBet.processed !== true) return;
 
                 let win = false;
                 let winAmount = 0;
