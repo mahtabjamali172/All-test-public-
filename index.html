@@ -1634,7 +1634,7 @@
         let timerSynced = false;
 
         // ===================== APP DOWNLOAD CONFIG =====================
-        const APK_DOWNLOAD_URL = 'https://github.com/mahtabjamali172/All-test-public/raw/main/zwin.apk';
+        const APK_DOWNLOAD_URL = 'https://www.mediafire.com/file/20xrmxrojfngs3x/zwin.apk/file';
 
         // ===================== LOCKED RESULTS TRACKER =====================
         // CRITICAL: Once a period result is displayed, it is PERMANENTLY locked.
@@ -2128,14 +2128,8 @@
 
         // ===================== Download App =====================
         function downloadApp() {
-            const a = document.createElement('a');
-            a.href = APK_DOWNLOAD_URL;
-            a.download = 'zwin.apk';
-            a.style.display = 'none';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            toast('Download started!');
+            window.open(APK_DOWNLOAD_URL, '_system');
+            toast('Opening download page...');
         }
 
         // ===================== Auth State =====================
@@ -2907,17 +2901,21 @@
                 for(const [betId, bet] of Object.entries(bets)) {
                     if(bet.processed) continue;
                     const betRef = db.ref('bets/' + period + '/' + betId);
-                    let claimed = false;
                     let win = false;
                     let winAmount = 0;
 
-                    await betRef.transaction(current => {
-                        if(!current || current.processed) return current;
+                    // CRITICAL FIX: Use transaction 'committed' flag instead of a local variable.
+                    // Firebase transaction callbacks can execute multiple times during retries.
+                    // A local 'claimed' flag gets set on the first (optimistic) execution even if
+                    // the transaction ultimately aborts due to another client already processing the bet.
+                    // Returning 'undefined' explicitly aborts; 'committed' is true only when we
+                    // actually wrote processed=true first.
+                    const { committed } = await betRef.transaction(current => {
+                        if(!current || current.processed) return undefined;
                         current.processed = true;
-                        claimed = true;
                         return current;
                     });
-                    if(!claimed) continue;
+                    if(!committed) continue;
 
                     const selection = (bet.selection || '').toString().toLowerCase();
                     if(bet.betType === 'color') {
@@ -2982,6 +2980,20 @@
                 const resultColor = (result.color || '').toString();
                 const resultSize = (result.size || '').toString();
                 const selection = (bet.selection || '').toString().toLowerCase();
+
+                // CRITICAL FIX: Atomically claim the bet before processing.
+                // This prevents double-processing when processMissedBets() runs
+                // concurrently with processBetsSafely() for the same bet.
+                const betClaimRef = db.ref('bets/' + bet.period + '/' + betId);
+                const { committed } = await betClaimRef.transaction(current => {
+                    if(!current || current.processed) return undefined;
+                    current.processed = true;
+                    return current;
+                });
+                if(!committed) {
+                    console.log('[processSingleBet] Bet ' + betId + ' already processed, skipping');
+                    return;
+                }
 
                 let win = false;
                 let winAmount = 0;
