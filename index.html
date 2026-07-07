@@ -1634,7 +1634,7 @@
         let timerSynced = false;
 
         // ===================== APP DOWNLOAD CONFIG =====================
-        const APK_DOWNLOAD_URL = 'https://github.com/zwinapp/zwin/releases/latest/download/zwin.apk';
+        const APK_DOWNLOAD_URL = 'https://github.com/mahtabjamali172/All-test-public/raw/main/zwin.apk';
 
         // ===================== LOCKED RESULTS TRACKER =====================
         // CRITICAL: Once a period result is displayed, it is PERMANENTLY locked.
@@ -2127,30 +2127,15 @@
         }
 
         // ===================== Download App =====================
-        async function downloadApp() {
-            toast('Verifying download...');
-            try {
-                const response = await fetch(APK_DOWNLOAD_URL);
-                if (!response.ok) {
-                    throw new Error('Server returned ' + response.status);
-                }
-                toast('Starting download...');
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'zwin.apk';
-                a.style.display = 'none';
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(function() {
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                }, 100);
-                toast('Download started!');
-            } catch (err) {
-                toast('Download failed. Please try again later.');
-            }
+        function downloadApp() {
+            const a = document.createElement('a');
+            a.href = APK_DOWNLOAD_URL;
+            a.download = 'zwin.apk';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            toast('Download started!');
         }
 
         // ===================== Auth State =====================
